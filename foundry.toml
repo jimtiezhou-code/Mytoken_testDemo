@@ -1,0 +1,19 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.25"
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/"
+]
+
+# RPC 端点
+[rpc_endpoints]
+sepolia = "https://ethereum-sepolia-rpc.publicnode.com"
+mainnet = "https://virginia.rpc.blxrbdn.com"
+
+# Etherscan 合约验证（API key 从 .env 读取，URL 自动识别）
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+
