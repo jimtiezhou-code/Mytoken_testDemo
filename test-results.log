@@ -15,7 +15,7 @@ Ran 14 tests for test/TokenBank.t.sol:TokenBankTest
 [PASS] test_WithdrawNoDepositReverts() (gas: 14213)
 [PASS] test_WithdrawOverBalanceReverts() (gas: 86706)
 [PASS] test_WithdrawZeroReverts() (gas: 11979)
-Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 3.04s (278.05ms CPU time)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 3.21s (257.73ms CPU time)
 
 Ran 16 tests for test/BankDemo.t.sol:BankDemoTest
 [PASS] test_DepositUpdatesBalance() (gas: 76578)
@@ -34,7 +34,7 @@ Ran 16 tests for test/BankDemo.t.sol:BankDemoTest
 [PASS] test_Top3_ThreeUsers() (gas: 197282)
 [PASS] test_Top3_TwoUsers() (gas: 140018)
 [PASS] test_WithdrawWithZeroBalanceReverts() (gas: 13717)
-Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 3.52s (2.19ms CPU time)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 3.71s (5.09ms CPU time)
 
 Ran 7 tests for test/TokenBankUSDT.t.sol:TokenBankUSDTTest
 [PASS] test_DepositZeroReverts() (gas: 11956)
@@ -44,6 +44,6 @@ Ran 7 tests for test/TokenBankUSDT.t.sol:TokenBankUSDTTest
 [PASS] test_USDT_TransferFromReturnsNoData() (gas: 57554)
 [PASS] test_WithdrawNoBalanceReverts() (gas: 14257)
 [PASS] test_WithdrawZeroReverts() (gas: 12001)
-Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 6.13s (1.66s CPU time)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 8.57s (2.77s CPU time)
 
-Ran 3 test suites in 11.76s (12.68s CPU time): 37 tests passed, 0 failed, 0 skipped (37 total tests)
+Ran 3 test suites in 10.22s (15.50s CPU time): 37 tests passed, 0 failed, 0 skipped (37 total tests)
