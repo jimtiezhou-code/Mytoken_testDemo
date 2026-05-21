@@ -1,4 +1,30 @@
-No files changed, compilation skipped
+Compiling 3 files with Solc 0.8.25
+Solc 0.8.25 finished in 373.20ms
+Compiler run successful with warnings:
+Warning (2018): Function state mutability can be restricted to view
+   --> test/TokenBank.t.sol:147:5:
+    |
+147 |     function test_GetTokenInfo() public {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/TokenBankUSDT.t.sol:34:5:
+   |
+34 |     function test_GetTokenInfo() public {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/TokenBankUSDT.t.sol:41:5:
+   |
+41 |     function test_GetTotalBalance_Zero() public {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+  --> test/TokenBankUSDT.t.sol:45:5:
+   |
+45 |     function test_GetDepositBalance_Zero() public {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
 
 Ran 14 tests for test/TokenBank.t.sol:TokenBankTest
 [PASS] test_Deposit() (gas: 95226)
@@ -15,7 +41,40 @@ Ran 14 tests for test/TokenBank.t.sol:TokenBankTest
 [PASS] test_WithdrawNoDepositReverts() (gas: 14213)
 [PASS] test_WithdrawOverBalanceReverts() (gas: 86706)
 [PASS] test_WithdrawZeroReverts() (gas: 11979)
-Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 3.21s (257.73ms CPU time)
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 3.33s (276.79ms CPU time)
+
+Ran 30 tests for test/ERC721Demo.t.sol:ERC721DemoTest
+[PASS] test_Approve() (gas: 92270)
+[PASS] test_Approve_NotOwnerReverts() (gas: 70587)
+[PASS] test_Approve_OperatorCanApprove() (gas: 121246)
+[PASS] test_Approve_ToOwnerReverts() (gas: 64154)
+[PASS] test_BalanceOf_AfterTransfer() (gas: 80389)
+[PASS] test_BalanceOf_ZeroAddressReverts() (gas: 9563)
+[PASS] test_Constructor() (gas: 18830)
+[PASS] test_FullLifecycle() (gas: 248009)
+[PASS] test_GetApproved_NonexistentReverts() (gas: 11878)
+[PASS] test_Mint() (gas: 64631)
+[PASS] test_MintExistingTokenReverts() (gas: 66167)
+[PASS] test_MintMultiple() (gas: 149607)
+[PASS] test_MintToZeroAddressReverts() (gas: 12377)
+[PASS] test_OwnerOf_NonexistentReverts() (gas: 11819)
+[PASS] test_SafeTransferFrom() (gas: 84041)
+[PASS] test_SafeTransferFrom_NotOwnerReverts() (gas: 72122)
+[PASS] test_SafeTransferFrom_WithData() (gas: 84800)
+[PASS] test_SetApprovalForAll() (gas: 40486)
+[PASS] test_SetApprovalForAll_Revoke() (gas: 31915)
+[PASS] test_SetApprovalForAll_ToCallerReverts() (gas: 12431)
+[PASS] test_SupportsInterface() (gas: 11713)
+[PASS] test_TokenURI() (gas: 66736)
+[PASS] test_TokenURI_NonexistentReverts() (gas: 14082)
+[PASS] test_TransferFrom() (gas: 84834)
+[PASS] test_TransferFrom_ByApproved() (gas: 96839)
+[PASS] test_TransferFrom_ByOperator() (gas: 108137)
+[PASS] test_TransferFrom_ClearsApproval() (gas: 98261)
+[PASS] test_TransferFrom_NotOwnerReverts() (gas: 71972)
+[PASS] test_TransferFrom_ToZeroAddressReverts() (gas: 65278)
+[PASS] test_TransferFrom_WrongFromReverts() (gas: 69446)
+Suite result: ok. 30 passed; 0 failed; 0 skipped; finished in 3.33s (1.63s CPU time)
 
 Ran 16 tests for test/BankDemo.t.sol:BankDemoTest
 [PASS] test_DepositUpdatesBalance() (gas: 76578)
@@ -34,7 +93,7 @@ Ran 16 tests for test/BankDemo.t.sol:BankDemoTest
 [PASS] test_Top3_ThreeUsers() (gas: 197282)
 [PASS] test_Top3_TwoUsers() (gas: 140018)
 [PASS] test_WithdrawWithZeroBalanceReverts() (gas: 13717)
-Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 3.71s (5.09ms CPU time)
+Suite result: ok. 16 passed; 0 failed; 0 skipped; finished in 3.85s (3.97ms CPU time)
 
 Ran 7 tests for test/TokenBankUSDT.t.sol:TokenBankUSDTTest
 [PASS] test_DepositZeroReverts() (gas: 11956)
@@ -44,6 +103,6 @@ Ran 7 tests for test/TokenBankUSDT.t.sol:TokenBankUSDTTest
 [PASS] test_USDT_TransferFromReturnsNoData() (gas: 57554)
 [PASS] test_WithdrawNoBalanceReverts() (gas: 14257)
 [PASS] test_WithdrawZeroReverts() (gas: 12001)
-Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 8.57s (2.77s CPU time)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 6.67s (1.82s CPU time)
 
-Ran 3 test suites in 10.22s (15.50s CPU time): 37 tests passed, 0 failed, 0 skipped (37 total tests)
+Ran 4 test suites in 9.63s (17.18s CPU time): 67 tests passed, 0 failed, 0 skipped (67 total tests)
