@@ -57,12 +57,12 @@ anvil --port 8545
 forge script script/DeployTokenBank.s.sol:DeployTokenBank \
   --rpc-url http://127.0.0.1:8545 \
   --broadcast \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+  --private-key $PRIVATE_KEY
 ```
 
 MetaMask 配置：
 - 添加网络: `http://127.0.0.1:8545`, Chain ID: `31337`
-- 导入 Anvil Account #0 私钥: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+- 导入 Anvil Account #0 私钥（Anvil 启动时日志会打印，或通过 `$PRIVATE_KEY` 环境变量指定）
 
 ## 合约地址
 
