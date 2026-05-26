@@ -116,6 +116,12 @@ function App() {
     }
   }, [txSuccess, refetchTokenBalance, refetchDepositBalance, refetchAllowance]);
 
+  // Reset SIWE auth and transfers when wallet account changes
+  useEffect(() => {
+    setSiweAuthed(false);
+    setTransfers([]);
+  }, [address]);
+
   const tokenDecimals = (decimals as number) ?? 18;
 
   const parsedAmount = (() => {

@@ -3,6 +3,7 @@ import { hardhat } from 'viem/chains';
 import db from './db.js';
 
 const TOKEN_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+const POLL_INTERVAL_MS = 3000;
 
 const transferEvent = parseAbiItem(
   'event Transfer(address indexed from, address indexed to, uint256 value)'
@@ -18,9 +19,27 @@ const insertTransfer = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?)
 `);
 
-async function syncHistoricalLogs(fromBlock: bigint, toBlock: bigint) {
+function ingestLogs(logs: any[]) {
+  const insertMany = db.transaction(() => {
+    for (const log of logs) {
+      const { transactionHash, blockNumber, args } = log;
+      insertTransfer.run(
+        transactionHash ?? 'unknown',
+        Number(blockNumber),
+        args.from,
+        args.to,
+        args.value.toString(),
+        Math.floor(Date.now() / 1000)
+      );
+    }
+  });
+  insertMany();
+}
+
+async function syncRange(fromBlock: bigint, toBlock: bigint) {
   const BATCH_SIZE = 2000n;
   let currentFrom = fromBlock;
+  let total = 0;
 
   while (currentFrom <= toBlock) {
     const currentTo = currentFrom + BATCH_SIZE - 1n > toBlock ? toBlock : currentFrom + BATCH_SIZE - 1n;
@@ -33,23 +52,9 @@ async function syncHistoricalLogs(fromBlock: bigint, toBlock: bigint) {
         toBlock: currentTo,
       });
 
-      const insertMany = db.transaction(() => {
-        for (const log of logs) {
-          const { transactionHash, blockNumber, args } = log;
-          insertTransfer.run(
-            transactionHash ?? 'unknown',
-            Number(blockNumber),
-            (args as unknown as { from: string; to: string; value: bigint }).from,
-            (args as unknown as { from: string; to: string; value: bigint }).to,
-            ((args as unknown as { from: string; to: string; value: bigint }).value).toString(),
-            Math.floor(Date.now() / 1000)
-          );
-        }
-      });
-
       if (logs.length > 0) {
-        insertMany();
-        console.log(`[Indexer] Synced ${logs.length} events from blocks ${currentFrom}-${currentTo}`);
+        ingestLogs(logs);
+        total += logs.length;
       }
     } catch (err) {
       console.error(`[Indexer] Error syncing blocks ${currentFrom}-${currentTo}:`, err);
@@ -57,43 +62,41 @@ async function syncHistoricalLogs(fromBlock: bigint, toBlock: bigint) {
 
     currentFrom = currentTo + 1n;
   }
+
+  if (total > 0) {
+    console.log(`[Indexer] Synced ${total} events from blocks ${fromBlock}-${toBlock}`);
+  }
 }
 
 export async function startIndexer() {
-  console.log('[Indexer] Starting event indexer...');
+  console.log('[Indexer] Starting event indexer (polling mode)...');
 
-  // Sync historical events - from block 0 to latest
+  // Get last synced block from DB, or start from 0
+  const lastBlockRow = db.prepare('SELECT MAX(block_number) as last_block FROM transfers').get() as { last_block: number | null };
+  let lastSynced = lastBlockRow?.last_block ? BigInt(lastBlockRow.last_block) : 0n;
+
   const latestBlock = await client.getBlockNumber();
-  console.log(`[Indexer] Current block: ${latestBlock}`);
+  console.log(`[Indexer] Last synced block: ${lastSynced}, chain head: ${latestBlock}`);
 
-  // Sync from block 0 to latest
-  await syncHistoricalLogs(0n, latestBlock);
-  console.log('[Indexer] Historical sync complete');
+  // Catch up on any missed blocks
+  if (lastSynced < latestBlock) {
+    await syncRange(lastSynced, latestBlock);
+    lastSynced = latestBlock;
+  }
 
-  // Watch for new events
-  client.watchEvent({
-    address: TOKEN_ADDRESS,
-    event: transferEvent,
-    onLogs: (logs) => {
-      const insertMany = db.transaction(() => {
-        for (const log of logs) {
-          const { transactionHash, blockNumber, args } = log;
-          insertTransfer.run(
-            transactionHash ?? 'unknown',
-            Number(blockNumber),
-            (args as unknown as { from: string; to: string; value: bigint }).from,
-            (args as unknown as { from: string; to: string; value: bigint }).to,
-            ((args as unknown as { from: string; to: string; value: bigint }).value).toString(),
-            Math.floor(Date.now() / 1000)
-          );
-        }
-      });
-      if (logs.length > 0) {
-        insertMany();
-        console.log(`[Indexer] Indexed ${logs.length} new transfer events`);
+  console.log('[Indexer] Initial sync complete, starting polling...');
+
+  // Poll for new blocks
+  setInterval(async () => {
+    try {
+      const head = await client.getBlockNumber();
+      if (head > lastSynced) {
+        const from = lastSynced + 1n;
+        await syncRange(from, head);
+        lastSynced = head;
       }
-    },
-  });
-
-  console.log('[Indexer] Watching for new Transfer events...');
+    } catch (err) {
+      // silently retry on next interval
+    }
+  }, POLL_INTERVAL_MS);
 }
