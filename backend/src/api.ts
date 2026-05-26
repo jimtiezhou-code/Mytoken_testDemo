@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import db from './db.js';
+import { bloomFilter } from './bloom.js';
 
 const router = Router();
 
@@ -7,6 +8,16 @@ const router = Router();
 router.get('/transfers/:address', (req: Request, res: Response) => {
   const { address } = req.params;
   const { limit = '50', offset = '0' } = req.query;
+
+  // 布隆过滤器快速判定：地址从未出现在任何转账中，直接返回空
+  if (!bloomFilter.mightContain(address)) {
+    res.json({
+      success: true,
+      data: [],
+      pagination: { total: 0, limit: Number(limit), offset: Number(offset) },
+    });
+    return;
+  }
 
   const normalizedAddress = address.toLowerCase();
 

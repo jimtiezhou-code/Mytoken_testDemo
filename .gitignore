@@ -25,6 +25,9 @@ docs/
 *.db-shm
 *.db-wal
 
+# Bloom filter binary
+bloom.bin
+
 # Dotenv file
 .env
 .env.*

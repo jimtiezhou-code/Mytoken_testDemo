@@ -1,6 +1,7 @@
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { hardhat } from 'viem/chains';
 import db from './db.js';
+import { bloomFilter } from './bloom.js';
 
 const TOKEN_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 const POLL_INTERVAL_MS = 3000;
@@ -31,6 +32,9 @@ function ingestLogs(logs: any[]) {
         args.value.toString(),
         Math.floor(Date.now() / 1000)
       );
+      // 将 from 和 to 地址加入布隆过滤器
+      bloomFilter.add(args.from);
+      bloomFilter.add(args.to);
     }
   });
   insertMany();
@@ -86,6 +90,9 @@ export async function startIndexer() {
 
   console.log('[Indexer] Initial sync complete, starting polling...');
 
+  // 首次同步完成后持久化布隆过滤器
+  bloomFilter.save();
+
   // Poll for new blocks
   setInterval(async () => {
     try {
@@ -94,6 +101,7 @@ export async function startIndexer() {
         const from = lastSynced + 1n;
         await syncRange(from, head);
         lastSynced = head;
+        bloomFilter.save(); // 每次有新数据就持久化
       }
     } catch (err) {
       // silently retry on next interval

@@ -6,20 +6,27 @@
 ┌─────────────┐    Transfer 事件     ┌──────────────┐   poll / getLogs   ┌──────────┐
 │  Anvil 节点  │ ◄────────────────── │   Indexer     │ ─────────────────► │ SQLite3  │
 │  (HTTP 8545) │                     │   (后端轮询)   │                    │ transfers │
-└─────────────┘                      └──────┬───────┘                    └────┬─────┘
-                                            │                                │
-                                     Express API                        SELECT 查询
-                                     GET /api/transfers/:addr              │
-                                            │                                │
-                                     ┌──────┴───────┐                       │
-                                     │  Vite Proxy   │                       │
-                                     │  :5173 → :3001│                       │
-                                     └──────┬───────┘                       │
-                                            │                                │
-                                     ┌──────┴───────┐                       │
-                                     │   Frontend    │                       │
-                                     │  React App    │                       │
-                                     └──────────────┘                       │
+└─────────────┘                      └──┬───┬───────┘                    └────┬─────┘
+                                        │   │                                │
+                                        │   └── add(from)/add(to) ────┐     │
+                                        │                              ▼     │
+                                        │                         ┌──────────┐
+                                        │                         │  Bloom   │
+                                     Express API                  │  Filter  │
+                              GET /api/transfers/:addr            │ bloom.bin│
+                                        │                         └────┬─────┘
+                                        │                              │
+                                        └──── mightContain(addr) ─────┘
+                                        │
+                                 ┌──────┴───────┐
+                                 │  Vite Proxy   │
+                                 │  :5173 → :3001│
+                                 └──────┬───────┘
+                                        │
+                                 ┌──────┴───────┐
+                                 │   Frontend    │
+                                 │  React App    │
+                                 └──────────────┘
 ```
 
 ## 一、数据库设计 (db.ts)
@@ -110,7 +117,66 @@ const logs = await client.getLogs({
 - 只同步 `lastSynced` 到链头之间的新区块
 - 重启不会丢失进度, 也不会重复处理已入库的事件 (INSERT OR IGNORE)
 
-## 三、RESTful API (api.ts)
+## 三、布隆过滤器 (bloom.ts)
+
+### 为什么需要布隆过滤器？
+
+API 查询某地址的转账记录时，如果该地址**从未**参与过任何转账，可以直接返回空数组，跳过 SQLite 的 B-Tree 索引扫描。
+
+布隆过滤器是一个概率型数据结构，特点是：
+
+- `mightContain(x) = false` → x **一定不在**集合中（100% 准确）
+- `mightContain(x) = true`  → x **可能**在集合中（有误判率）
+
+所以我们用它做**快速否决**：过滤器说"没有"就直接返回空，说"可能有"才走 DB。
+
+### 实现原理
+
+```
+添加地址 "0xf39F..."
+  └─ .toLowerCase() → "0xf39f..."
+       └─ SHA256 哈希 → 取前 8 字节得 h1, h2
+            └─ Kirsch-Mitzenmacker: bit_i = (h1 + i * h2) % BIT_COUNT (i = 0..9)
+                 └─ 将 buffer 中第 bit_i 位置 1
+
+查询地址 "0xf39F..."
+  └─ 同样计算 10 个位
+       └─ 所有位都是 1 → "可能有" (走 DB 查)
+       └─ 任一位是 0   → "一定没有" (直接返回空)
+```
+
+### 参数选取
+
+```
+预期元素数 n = 100,000      (预计最多 10 万个不同地址)
+目标误判率 p = 0.001       (0.1%)
+────────────────────────────────────────
+位数组大小 m = -n·ln(p) / (ln2)² ≈ 1,437,750 bits ≈ 175 KB
+哈希函数数 k = (m/n)·ln2           ≈ 10
+```
+
+175 KB 常驻内存，10 次位运算判断，成本极低。
+
+### 持久化
+
+- **文件**: `backend/bloom.bin`（二进制，~175 KB）
+- **格式**: `[0xBF, 0x01]` (magic + version) + 位数组
+- **保存时机**: 索引器初次同步完成后 + 每次轮询到新数据后
+- **恢复**: 启动时从 `bloom.bin` 加载，文件不存在则从 SQLite 全量重建
+
+### 在查询链路中的位置
+
+```
+API: GET /api/transfers/:address
+  │
+  ├─ bloomFilter.mightContain(address)
+  │    ├─ false → 直接返回 { data: [], total: 0 }   ← 跳过 DB
+  │    └─ true  → 继续走 SQLite 查询
+  │
+  └─ SELECT * FROM transfers WHERE ...
+```
+
+## 四、RESTful API (api.ts)
 
 ### 端点说明
 
@@ -166,7 +232,7 @@ LIMIT ? OFFSET ?
 
 大小写不敏感匹配 (`lower()`), 结果按区块逆序排列 (最新的在前)。
 
-## 四、前后端通信链路
+## 五、前后端通信链路
 
 ```
 用户点击「刷新」
@@ -183,7 +249,7 @@ LIMIT ? OFFSET ?
             └─ 返回 JSON → App.tsx setTransfers() → React 渲染表格
 ```
 
-## 五、前端状态管理
+## 六、前端状态管理
 
 ```
 连接钱包 (useConnect)
@@ -202,15 +268,18 @@ LIMIT ? OFFSET ?
        └─ 用户需要重新点击「登录」完成新地址的签名
 ```
 
-## 六、文件清单
+## 七、文件清单
 
 ```
 backend/
+├── bloom.bin           — 布隆过滤器持久化文件 (gitignore)
+├── tokenbank.db        — SQLite3 数据库 (gitignore)
 ├── src/
-│   ├── index.ts     — 服务入口, 启动 Express + Indexer
-│   ├── db.ts        — SQLite3 建表 + 索引
-│   ├── indexer.ts   — Transfer 事件轮询索引器
-│   └── api.ts       — 转账记录查询接口
+│   ├── index.ts        — 服务入口, 启动 Express + Indexer + Bloom
+│   ├── db.ts           — SQLite3 建表 + 索引
+│   ├── bloom.ts        — 布隆过滤器实现 (SHA256 双重哈希)
+│   ├── indexer.ts      — Transfer 事件轮询索引器
+│   └── api.ts          — 转账记录查询接口 (含 Bloom 预判)
 
 frontend/src/
 ├── App.tsx          — SIWE 登录 + 转账记录面板
