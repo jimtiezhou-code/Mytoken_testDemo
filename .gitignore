@@ -22,6 +22,8 @@ docs/
 
 # SQLite database
 *.db
+*.db-shm
+*.db-wal
 
 # Dotenv file
 .env
