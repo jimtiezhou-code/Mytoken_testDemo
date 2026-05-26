@@ -348,3 +348,101 @@ $radius-sm: 8px;
     font-size: 15px;
   }
 }
+
+// SIWE badge
+.siwe-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: $success;
+  background: $success-glow;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-sm {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+// Transfer card
+.transfer-card {
+  .card-title {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.transfer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid $border;
+}
+
+.transfer-empty {
+  color: $text-muted;
+  text-align: center;
+  padding: 24px 0;
+  font-size: 14px;
+}
+
+.transfer-table-wrapper {
+  overflow-x: auto;
+}
+
+.transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th {
+    text-align: left;
+    color: $text-muted;
+    font-weight: 500;
+    padding: 8px 10px;
+    border-bottom: 1px solid $border;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 10px;
+    border-bottom: 1px solid rgba($border, 0.3);
+    color: $text-secondary;
+    white-space: nowrap;
+  }
+
+  tbody tr:hover {
+    background: rgba($accent, 0.04);
+  }
+
+  .mono {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+  }
+
+  .tag-self {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba($accent, 0.15);
+    color: $accent;
+  }
+
+  .transfer-amount {
+    font-family: ui-monospace, Consolas, monospace;
+    font-weight: 600;
+
+    &.in {
+      color: $success;
+    }
+
+    &.out {
+      color: $danger;
+    }
+  }
+}

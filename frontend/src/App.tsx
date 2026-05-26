@@ -7,6 +7,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   useBalance,
+  useSignMessage,
 } from 'wagmi';
 import { formatUnits, parseUnits } from 'viem';
 import { baseErc20Abi } from './contracts/BaseERC20';
@@ -14,15 +15,31 @@ import { tokenBankAbi } from './contracts/TokenBank';
 import { TOKEN_ADDRESS, TOKEN_BANK_ADDRESS } from './contracts/addresses';
 import './App.scss';
 
+interface TransferRecord {
+  id: number;
+  tx_hash: string;
+  block_number: number;
+  from_address: string;
+  to_address: string;
+  amount: string;
+  timestamp: number;
+  created_at: string;
+}
+
 function App() {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: ethBalance } = useBalance({ address });
+  const { signMessageAsync } = useSignMessage();
 
   const [amount, setAmount] = useState('');
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [action, setAction] = useState<'approve' | 'deposit' | 'withdraw'>('deposit');
+  const [siweAuthed, setSiweAuthed] = useState(false);
+  const [siweSigning, setSiweSigning] = useState(false);
+  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
+  const [transfersLoading, setTransfersLoading] = useState(false);
 
   // Read token info
   const { data: tokenName } = useReadContract({
@@ -142,6 +159,36 @@ function App() {
     setAction('withdraw');
   }
 
+  async function handleSIWE() {
+    if (!address) return;
+    setSiweSigning(true);
+    try {
+      const message = `TokenBank Sign-In\n\nSign this message to verify you own ${address}.\n\nNonce: ${Date.now()}`;
+      await signMessageAsync({ message });
+      setSiweAuthed(true);
+      fetchTransfers(address);
+    } catch {
+      // user rejected signing
+    } finally {
+      setSiweSigning(false);
+    }
+  }
+
+  async function fetchTransfers(addr: string) {
+    setTransfersLoading(true);
+    try {
+      const res = await fetch(`/api/transfers/${addr}?limit=100`);
+      const json = await res.json();
+      if (json.success) {
+        setTransfers(json.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch transfers:', err);
+    } finally {
+      setTransfersLoading(false);
+    }
+  }
+
   const isProcessing = isWriting || isWaiting;
   const hasAllowance =
     allowance !== undefined &&
@@ -161,6 +208,17 @@ function App() {
               <span className="eth-balance">
                 {ethBalance ? Number(formatUnits(ethBalance.value, ethBalance.decimals)).toFixed(4) : '0'} ETH
               </span>
+              {siweAuthed ? (
+                <span className="siwe-badge">SIWE</span>
+              ) : (
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={handleSIWE}
+                  disabled={siweSigning}
+                >
+                  {siweSigning ? '签名中...' : '登录'}
+                </button>
+              )}
               <button className="btn btn-outline" onClick={() => disconnect()}>
                 断开连接
               </button>
@@ -293,6 +351,67 @@ function App() {
               操作流程：先授权 TokenBank 使用你的代币，再进行存款或取款
             </p>
           </div>
+
+          {/* Transfer Records */}
+          {siweAuthed && (
+            <div className="card transfer-card">
+              <div className="transfer-header">
+                <h2 className="card-title">转账记录</h2>
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => address && fetchTransfers(address)}
+                  disabled={transfersLoading}
+                >
+                  {transfersLoading ? '刷新中...' : '刷新'}
+                </button>
+              </div>
+              {transfers.length === 0 && !transfersLoading ? (
+                <p className="transfer-empty">暂无转账记录</p>
+              ) : (
+                <div className="transfer-table-wrapper">
+                  <table className="transfer-table">
+                    <thead>
+                      <tr>
+                        <th>交易哈希</th>
+                        <th>区块</th>
+                        <th>发送方</th>
+                        <th>接收方</th>
+                        <th>金额</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transfers.map((t) => (
+                        <tr key={t.id}>
+                          <td className="mono">
+                            {t.tx_hash.slice(0, 10)}...
+                          </td>
+                          <td>{t.block_number}</td>
+                          <td className="mono">
+                            {t.from_address.toLowerCase() === address?.toLowerCase() ? (
+                              <span className="tag tag-self">自己</span>
+                            ) : (
+                              `${t.from_address.slice(0, 6)}...${t.from_address.slice(-4)}`
+                            )}
+                          </td>
+                          <td className="mono">
+                            {t.to_address.toLowerCase() === address?.toLowerCase() ? (
+                              <span className="tag tag-self">自己</span>
+                            ) : (
+                              `${t.to_address.slice(0, 6)}...${t.to_address.slice(-4)}`
+                            )}
+                          </td>
+                          <td className={`transfer-amount ${t.from_address.toLowerCase() === address?.toLowerCase() ? 'in' : 'out'}`}>
+                            {t.from_address.toLowerCase() === address?.toLowerCase() ? '+' : '-'}
+                            {formatUnits(BigInt(t.amount), tokenDecimals)} {tokenSymbol ?? ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </main>
       )}
 

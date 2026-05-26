@@ -20,6 +20,9 @@ node_modules/
 # Docs
 docs/
 
+# SQLite database
+*.db
+
 # Dotenv file
 .env
 .env.*
