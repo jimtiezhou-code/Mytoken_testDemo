@@ -1,0 +1,20 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x6f10D4d51084C2946098E53556Fd2Bb8b81Af445",
+  "deployMethod": "keystore",
+  "contracts": {
+    "BaseERC20": {
+      "address": "0x54645eD7Df92a504cb93D2474Fe8E30fC6851867",
+      "name": "BaseERC20",
+      "symbol": "BERC20",
+      "totalSupply": "100000000 BERC20",
+      "etherscan": "https://sepolia.etherscan.io/address/0x54645eD7Df92a504cb93D2474Fe8E30fC6851867"
+    },
+    "TokenBank": {
+      "address": "0xcF025458cDC5f042FAbC8CCA39928A8B1204c3F7",
+      "etherscan": "https://sepolia.etherscan.io/address/0xcF025458cDC5f042FAbC8CCA39928A8B1204c3F7"
+    }
+  },
+  "deployedAt": "2026-06-02T00:00:00Z"
+}

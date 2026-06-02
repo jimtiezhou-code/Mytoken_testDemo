@@ -1,11 +1,12 @@
 import { createConfig, http } from 'wagmi';
-import { hardhat } from 'wagmi/chains';
+import { hardhat, sepolia } from 'wagmi/chains';
 import { injected } from 'wagmi/connectors';
 
 export const config = createConfig({
-  chains: [hardhat],
+  chains: [hardhat, sepolia],
   connectors: [injected()],
   transports: {
     [hardhat.id]: http('http://127.0.0.1:8545'),
+    [sepolia.id]: http(import.meta.env.VITE_SEPOLIA_RPC_URL || 'https://sepolia.drpc.org'),
   },
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   useAccount,
+  useChainId,
   useConnect,
   useDisconnect,
   useReadContract,
@@ -9,10 +10,12 @@ import {
   useBalance,
   useSignMessage,
 } from 'wagmi';
-import { formatUnits, parseUnits } from 'viem';
+import { formatUnits, parseUnits, encodeFunctionData } from 'viem';
 import { baseErc20Abi } from './contracts/BaseERC20';
 import { tokenBankAbi } from './contracts/TokenBank';
-import { TOKEN_ADDRESS, TOKEN_BANK_ADDRESS } from './contracts/addresses';
+import {
+  getAddresses,
+} from './contracts/addresses';
 import './App.scss';
 
 interface TransferRecord {
@@ -28,14 +31,17 @@ interface TransferRecord {
 
 function App() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: ethBalance } = useBalance({ address });
   const { signMessageAsync } = useSignMessage();
 
+  const { TOKEN_ADDRESS, TOKEN_BANK_ADDRESS } = getAddresses(chainId);
+
   const [amount, setAmount] = useState('');
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
-  const [action, setAction] = useState<'approve' | 'deposit' | 'withdraw'>('deposit');
+  const [action, setAction] = useState<'approve' | 'deposit' | 'withdraw' | 'eip7702Deposit'>('deposit');
   const [siweAuthed, setSiweAuthed] = useState(false);
   const [siweSigning, setSiweSigning] = useState(false);
   const [transfers, setTransfers] = useState<TransferRecord[]>([]);
@@ -79,7 +85,7 @@ function App() {
   });
 
   // Read total bank balance
-  const { data: totalBankBalance } = useReadContract({
+  const { data: totalBankBalance, refetch: refetchTotalBalance } = useReadContract({
     address: TOKEN_BANK_ADDRESS,
     abi: tokenBankAbi,
     functionName: 'getTotalBalance',
@@ -111,10 +117,13 @@ function App() {
       refetchTokenBalance();
       refetchDepositBalance();
       refetchAllowance();
+      refetchTotalBalance();
       setTxHash(undefined);
       setAmount('');
+      setEip7702Processing(false);
+      setEip7702Error(null);
     }
-  }, [txSuccess, refetchTokenBalance, refetchDepositBalance, refetchAllowance]);
+  }, [txSuccess, refetchTokenBalance, refetchDepositBalance, refetchAllowance, refetchTotalBalance]);
 
   // Reset SIWE auth and transfers when wallet account changes
   useEffect(() => {
@@ -165,6 +174,87 @@ function App() {
     setAction('withdraw');
   }
 
+  const [eip7702Processing, setEip7702Processing] = useState(false);
+  const [eip7702Error, setEip7702Error] = useState<string | null>(null);
+
+  async function handleEIP7702Deposit() {
+    if (!address || !parsedAmount) return;
+    setEip7702Processing(true);
+    setEip7702Error(null);
+
+    try {
+      const approveCalldata = encodeFunctionData({
+        abi: baseErc20Abi,
+        functionName: 'approve',
+        args: [TOKEN_BANK_ADDRESS, parsedAmount],
+      });
+
+      const depositCalldata = encodeFunctionData({
+        abi: tokenBankAbi,
+        functionName: 'deposit',
+        args: [parsedAmount],
+      });
+
+      const ethereum = (window as any).ethereum;
+      if (!ethereum) {
+        throw new Error('未检测到 MetaMask');
+      }
+
+      const chainIdHex = await ethereum.request({ method: 'eth_chainId' });
+
+      const result = await ethereum.request({
+        method: 'wallet_sendCalls',
+        params: [{
+          version: '2.0.0',
+          chainId: chainIdHex,
+          from: address,
+          atomicRequired: true,
+          calls: [
+            { to: TOKEN_ADDRESS, data: approveCalldata, value: '0x0' },
+            { to: TOKEN_BANK_ADDRESS, data: depositCalldata, value: '0x0' },
+          ],
+        }],
+      });
+
+      const bundleId = result.id;
+      let pollCount = 0;
+      const poll = setInterval(async () => {
+        try {
+          pollCount++;
+          const status = await ethereum.request({
+            method: 'wallet_getCallsStatus',
+            params: [bundleId],
+          });
+          const code = Number(status.status);
+          if (code === 200) {
+            clearInterval(poll);
+            const txHash = status.receipts?.[0]?.transactionHash;
+            if (txHash) setTxHash(txHash as `0x${string}`);
+            setAction('eip7702Deposit');
+            setEip7702Processing(false);
+          } else if (code >= 400 || pollCount > 30) {
+            clearInterval(poll);
+            setEip7702Error(code >= 400 ? `批量交易失败 (status: ${code})` : '交易确认超时，请检查钱包');
+            setEip7702Processing(false);
+          }
+        } catch {
+          if (pollCount > 30) {
+            clearInterval(poll);
+            setEip7702Processing(false);
+          }
+        }
+      }, 2000);
+    } catch (err: any) {
+      if (err?.code === 4001) {
+        setEip7702Error('用户取消了交易');
+      } else {
+        setEip7702Error(err?.message || err?.code || 'EIP-7702 存款执行失败');
+      }
+      setEip7702Processing(false);
+    }
+  }
+
+
   async function handleSIWE() {
     if (!address) return;
     setSiweSigning(true);
@@ -195,7 +285,7 @@ function App() {
     }
   }
 
-  const isProcessing = isWriting || isWaiting;
+  const isProcessing = isWriting || isWaiting || eip7702Processing;
   const hasAllowance =
     allowance !== undefined &&
     (allowance as bigint) >= parsedAmount &&
@@ -353,8 +443,32 @@ function App() {
               </button>
             </div>
 
+            <div className="smart-section">
+              <div className="smart-divider">
+                <span>EIP-7702 批量存款（授权+存款一体）</span>
+              </div>
+              <button
+                className="btn btn-eip7702"
+                onClick={handleEIP7702Deposit}
+                disabled={!parsedAmount || !address || isProcessing}
+              >
+                {eip7702Processing
+                  ? '授权签名中...'
+                  : isWaiting && action === 'eip7702Deposit'
+                  ? '交易确认中...'
+                  : '一键授权+存款'}
+              </button>
+              {eip7702Error && (
+                <div className="tx-notice error">{eip7702Error}</div>
+              )}
+              <p className="hint">
+                MetaMask 在 Sepolia 上自动使用 <b>EIP-7702 type-4 授权交易</b>，
+                将 approve + deposit 封装为一次原子交易。一次签名，两步完成。
+              </p>
+            </div>
+
             <p className="hint">
-              操作流程：先授权 TokenBank 使用你的代币，再进行存款或取款
+              常规操作流程：先授权 TokenBank 使用你的代币，再进行存款或取款
             </p>
           </div>
 
